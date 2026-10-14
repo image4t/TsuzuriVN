@@ -1,0 +1,10 @@
+node_modules/
+.npm-cache/
+dist/
+*.local
+test-results/
+playwright-report/
+tests/*.png
+.DS_Store
+*.tsbuildinfo
+Project/Testシナリオ/無題の物語.json

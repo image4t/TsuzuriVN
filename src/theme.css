@@ -1,0 +1,37 @@
+/* Editor theme only: playback and speaker-defined text colors stay independent. */
+:root{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark;background:#141a1e;color:#e0e7e3}
+[data-theme=dark] .app{--border:#35413f;color:#e0e7e3}
+[data-theme=dark] :is(.topbar,.scene-panel,.editor-panel,.preview-panel,.scenario-card,.rename-dialog,.bulk-header,.bulk-toolbar,.bulk-lines-panel,.bulk-footer,.library-empty){background:#1e272b;border-color:#35413f;color:#e0e7e3}
+[data-theme=dark] :is(.app,.bulk-dialog) :is(button,input,textarea,select){background-color:#253136;border-color:#43514f;color:#dce7e1}
+[data-theme=dark] :is(.app,.bulk-dialog) button:hover{background-color:#32423f;border-color:#729787}
+[data-theme=dark] :is(.app,.bulk-dialog) :is(input,textarea,select):focus{border-color:#8db7a0}
+[data-theme=dark] :is(.app,.bulk-dialog) .primary{background:#426e59;border-color:#568b70;color:#fff}
+[data-theme=dark] :is(.app,.bulk-dialog) .primary:hover{background:#52856c}
+[data-theme=dark] :is(.brand,.guide h2,.library-empty h2){color:#dce9e1}
+[data-theme=dark] :is(.brand-icon,.upload-icon,.library-count,.panel-heading h2 span,.library-note){background:#2c3d36;color:#b6cdbc}
+[data-theme=dark] :is(.panel-heading,.editor-tabs,.import-box,.project-settings,.story-stats,.story-stats>div,.tip,.scenario-actions,.voice-editor,.bgm-editor,.speaker-color-settings,.bulk-steps,.bulk-filter,.bulk-selection,.bulk-line,.bulk-page-controls,.bulk-footer,.bulk-header,.bulk-toolbar){border-color:#35413f}
+[data-theme=dark] :is(.scene-card,.dropzone,.voice-empty,.voice-list li,.bgm-file,.tip,.bulk-line-head,.bulk-page-controls){background:#253035;border-color:#43514f}
+[data-theme=dark] .scene-card.selected{background:#32443c;border-color:#85aa94}
+[data-theme=dark] :is(.scene-select,.scene-reorder button,.editor-tabs button,.import-box button,.panel-heading button,.editor-title button,.scenario-actions button,.filter-result button,.bulk-selection button){background:transparent}
+[data-theme=dark] .scene-thumb{background:#34423d;color:#a2b9aa}
+[data-theme=dark] .scenario-cover{background:linear-gradient(140deg,#2d3d36,#23312f);color:#b0c7b4}
+[data-theme=dark] .scenario-cover:hover{background:linear-gradient(140deg,#3a5143,#30463d)}
+[data-theme=dark] .bulk-dialog{background:#172024;color:#dce7e1;border-color:#43514f}
+[data-theme=dark] .bulk-line{background:linear-gradient(var(--speaker-tint,#0000),var(--speaker-tint,#0000)),#1e272b}
+[data-theme=dark] :is(.bulk-preview-list article,.bulk-assign button[style]){background:linear-gradient(var(--speaker-tint),var(--speaker-tint)),#253035}
+[data-theme=dark] .bulk-line.unassigned select{background:#403628;color:#e4c797;border-color:#786246}
+[data-theme=dark] .bulk-line.selected{outline-color:#a2c295}
+[data-theme=dark] .bulk-color-options .speaker-color-settings{background:#253035;border-color:#43514f}
+[data-theme=dark] :is(.app,.bulk-dialog) :is(.workspace-heading p,.brand-caption,.eyebrow,.save-state,.scene-summary p,.scene-summary small,.field-label>span,.field-note,.dropzone-button>span:not(.upload-icon),.dropzone-button small,.dropzone-button em,.preview-caption,.live-dot,.toggle-row small,.story-stats span,.story-stats strong,.tip p,footer,.empty-list,.guide,.import-box>span,.import-box p,.library-section-heading>span,.scenario-info>p,.scenario-info>small,.library-empty p,.voice-empty,.voice-order,.voice-list button,.bgm-options,.bgm-file small,.audio-volumes label,.audio-volumes output,.speaker-color-settings>p,.speaker-color-entry>span,.speaker-color-entry button,.scene-filters label,.scene-filters summary,.filter-result,.bulk-save,.bulk-steps,.bulk-source-heading p,.bulk-check,.bulk-speaker-entry label,.bulk-assign>span,.bulk-tools-note,.bulk-filter button,.bulk-selection button,.bulk-line-head,.line-number,.bulk-preview p,.bulk-preview strong,.bulk-preview small,.bulk-preview-list strong,.bulk-preview-list p,.bulk-page-controls,.bulk-color-options,.empty-editor){color:#aebfb4}
+[data-theme=dark] :is(.bulk-launch,.editor-tabs button.active,.scenario-actions .scenario-edit,.filter-result button){color:#a4d5b8!important}
+[data-theme=dark] :is(.error,.voice-error){background:#412c2c;border-color:#79514b;color:#f0b8a9}
+[data-theme=dark] :is(.failed,.filter-selection-note){color:#e5bd91}
+[data-theme=dark] .theme-switch{white-space:nowrap}
+[data-theme=dark] :is(.app,.bulk-dialog) :is(input,textarea)::placeholder{color:#93a79d;opacity:1}
+[data-theme=dark] .app .toggle-row input:checked{background:#648a6b}
+[data-theme=dark] :is(.app,.bulk-dialog) input[type=range]{background:transparent;border:0}
+/* Game controls use their own palette regardless of the editor theme. */
+.player{color-scheme:dark}
+
+[data-theme=dark] .text-copy-status{color:#b5d2bf}

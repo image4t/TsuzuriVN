@@ -1,0 +1,35 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+const browser=await chromium.launch({channel:'msedge',headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+const upload=()=>page.locator('input[type=file][accept^="image/png"]').first();
+const selected=()=>page.getByAltText('選択した背景画像');
+const scene=async index=>page.locator('.scene-select').nth(index).click();
+const exportProject=async()=>{const promise=page.waitForEvent('download');await page.getByRole('button',{name:'書き出す',exact:true}).click();const download=await promise;return JSON.parse(await fs.readFile(await download.path(),'utf8'));};
+try{
+ await page.goto(process.env.VN_TEST_URL??'http://127.0.0.1:5175');await page.getByRole('button',{name:'新規シナリオ',exact:true}).click();await page.getByRole('button',{name:'シーンを追加',exact:true}).first().click();
+ assert.ok(await page.getByRole('radio',{name:'前の背景画像を引き継ぐ'}).isChecked());assert.equal(await selected().count(),0);
+ const a='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=';
+ const b=await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=2;canvas.height=2;const context=canvas.getContext('2d');context.fillStyle='#6699cc';context.fillRect(0,0,2,2);return canvas.toDataURL('image/png').split(',')[1];});
+ await upload().setInputFiles({name:'a.png',mimeType:'image/png',buffer:Buffer.from(a,'base64')});await selected().waitFor();const imageA=await selected().getAttribute('src');assert.ok(await page.getByRole('radio',{name:'このシーンで画像を変更'}).isChecked());
+ await page.getByRole('textbox',{name:/^本文/}).fill('画像Aを設定');await page.getByRole('button',{name:'シーンを追加',exact:true}).first().click();await page.getByRole('textbox',{name:/^本文/}).fill('前の背景を継続');assert.equal(await selected().getAttribute('src'),imageA);assert.ok(await page.getByRole('radio',{name:'前の背景画像を引き継ぐ'}).isChecked());
+ await page.getByRole('button',{name:'シーンを追加',exact:true}).first().click();await page.getByRole('textbox',{name:/^本文/}).fill('継続を続ける');assert.equal(await selected().getAttribute('src'),imageA);
+ await scene(0);await upload().setInputFiles({name:'b.png',mimeType:'image/png',buffer:Buffer.from(b,'base64')});await page.getByText('b.png',{exact:true}).waitFor();const imageB=await selected().getAttribute('src');assert.notEqual(imageB,imageA);
+ await scene(1);assert.equal(await selected().getAttribute('src'),imageB);assert.ok((await page.locator('.mini-game').evaluate(e=>getComputedStyle(e).backgroundImage)).includes(imageB));
+ await scene(2);assert.equal(await selected().getAttribute('src'),imageB);assert.equal(await page.locator('.scene-thumb img').count(),3);
+ const saved=await exportProject();assert.equal(saved.scenes[1].imageMode,'inherit');assert.equal(saved.scenes[1].image,null);assert.equal(saved.scenes[2].image,null);
+ await page.getByRole('button',{name:'このシーンから再生'}).click();assert.ok((await page.locator('.game-background').evaluate(e=>getComputedStyle(e).backgroundImage)).includes(imageB));await page.keyboard.press('ArrowLeft');assert.ok((await page.locator('.game-background').evaluate(e=>getComputedStyle(e).backgroundImage)).includes(imageB));await page.keyboard.press('Escape');
+ await scene(1);await page.getByRole('radio',{name:'このシーンから画像なし'}).check();assert.equal(await selected().count(),0);await scene(2);assert.equal(await selected().count(),0);assert.ok(await page.getByRole('radio',{name:'前の背景画像を引き継ぐ'}).isChecked());
+ await page.getByRole('button',{name:'このシーンから再生'}).click();assert.equal(await page.locator('.game-background').evaluate(e=>getComputedStyle(e).backgroundImage),'none');await page.keyboard.press('Escape');
+ await scene(1);await page.getByRole('radio',{name:'前の背景画像を引き継ぐ'}).check();assert.equal(await selected().getAttribute('src'),imageB);
+ await scene(2);await upload().setInputFiles({name:'a.png',mimeType:'image/png',buffer:Buffer.from(a,'base64')});await page.getByText('a.png',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'シーンを追加',exact:true}).first().click();await page.getByRole('textbox',{name:/^本文/}).fill('画像Aを引き継ぐ');assert.equal(await selected().getAttribute('src'),imageA);
+ await page.getByRole('button',{name:'シーン4を上へ'}).click();assert.equal(await selected().getAttribute('src'),imageB,'reorder changes the inherited source');
+ await page.getByRole('button',{name:'シーン3を下へ'}).click();assert.equal(await selected().getAttribute('src'),imageA);
+ await scene(2);await page.getByRole('button',{name:'シーンを削除',exact:true}).click();assert.equal(await selected().getAttribute('src'),imageB,'deleting source resolves the preceding background');
+ await page.getByRole('button',{name:'背景画像を削除'}).click();assert.equal(await selected().count(),0);await page.getByRole('radio',{name:'前の背景画像を引き継ぐ'}).check();assert.equal(await selected().getAttribute('src'),imageB);
+ await page.getByText('自動保存済み',{exact:true}).waitFor();await page.reload();await page.getByRole('button',{name:'編集する',exact:true}).click();await scene(2);assert.equal(await selected().evaluate(async image=>btoa(String.fromCharCode(...new Uint8Array(await (await fetch(image.src)).arrayBuffer())))),b);
+ const project=await exportProject();await page.locator('input[type=file][accept=".json,application/json"]').setInputFiles({name:'restore.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({...project,title:'背景の復元'}))});await page.waitForFunction(()=>document.querySelector('.project-settings input')?.value==='背景の復元');await scene(2);assert.equal(await selected().evaluate(async image=>btoa(String.fromCharCode(...new Uint8Array(await (await fetch(image.src)).arrayBuffer())))),b);
+ await page.screenshot({path:'tests/backgrounds.png',fullPage:true});assert.deepEqual(errors,[]);console.log('PASS: background inherit/change/none, live source replacement, thumbnail/preview/player/middle start, reorder/source deletion, compact JSON and autosave/import restore; no runtime errors');
+}finally{await browser.close();}

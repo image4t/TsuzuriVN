@@ -1,0 +1,56 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+const browser=await chromium.launch({channel:'msedge',headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:1000}});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+const sample=['川面が、夕日に染まっていた。','西の空から差し込む橙色の光が、緩やかに流れる川の表面をきらきらと輝かせている。対岸には住宅街が続き、その向こうに見える建物の輪郭も、少しずつ夕闇に溶け始めていた。','放課後の河川敷。','緩やかな土手の斜面に腰を下ろした純一は、大きく息を吐いた。','「はあ……。なんか、こういうのもいいね」','「何が？」','隣に座る詞が、膝の上に置いた鞄から視線を上げた。','「こうして絢辻さんと、何もしないでのんびりするのってさ」'];
+const modal=()=>page.getByRole('dialog',{name:'文章から、まとめてシーンを作る'});
+const open=async()=>{await page.getByRole('button',{name:'文章からまとめて作成'}).click();await modal().getByRole('button',{name:'まとめて作成を閉じる'}).waitFor();await modal().getByRole('button',{name:'まとめて作成を閉じる'}).isEnabled();};
+const exportProject=async()=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name:'書き出す',exact:true}).click();const download=await pending;return JSON.parse(await fs.readFile(await download.path(),'utf8'));};
+try{
+ await page.goto(process.env.VN_TEST_URL??'http://127.0.0.1:5175');
+ const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=';
+ const bgm={id:'bgm',name:'music.mp3',data:`data:audio/mpeg;base64,${(await fs.readFile(new URL('./fixtures/tone.mp3',import.meta.url))).toString('base64')}`};
+ const base={speaker:'',image:null,imageName:'',voices:[],bgm:{mode:'inherit'}};
+ await page.locator('input[type=file][accept=".json,application/json"]').setInputFiles({name:'base.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({version:1,title:'まとめて作成テスト',scenes:[{...base,text:'元の場面',image,imageName:'背景.png',bgm:{mode:'track',track:bgm}},{...base,text:'既存の次の場面'}]}))});
+ await page.getByRole('textbox',{name:'本文'}).waitFor();await open();
+ await modal().getByRole('textbox',{name:'まとめて作成する原稿'}).fill(sample.join('\n'));
+ await modal().getByRole('button',{name:'行ごとに話者を指定'}).click();
+ assert.equal(await page.locator('.bulk-line').count(),8);assert.equal(await modal().getByRole('combobox',{name:'行1の話者',exact:true}).inputValue(),'""');
+ assert.equal(await modal().getByRole('combobox',{name:'行5の話者',exact:true}).inputValue(),'null');assert.ok(await modal().getByRole('button',{name:/シーンを追加/}).isDisabled());
+ await modal().getByRole('textbox',{name:'登場人物名'}).fill('純一、詞');await modal().getByRole('button',{name:'登録',exact:true}).click();
+ await modal().getByRole('combobox',{name:'行5の話者',exact:true}).selectOption('"純一"');await modal().getByRole('combobox',{name:'行6の話者',exact:true}).selectOption('"詞"');await modal().getByRole('combobox',{name:'行8の話者',exact:true}).selectOption('"純一"');
+ assert.equal(await page.locator('.bulk-preview-list article').count(),5);
+ await modal().getByRole('combobox',{name:'シーンの追加位置'}).selectOption('after');
+ await page.screenshot({path:'tests/bulk.png',fullPage:true});
+ await modal().getByRole('button',{name:'5シーンを追加',exact:true}).click();await modal().waitFor({state:'detached'});assert.equal(await page.locator('.scene-card').count(),7);
+ const exported=await exportProject();assert.deepEqual(exported.scenes.map(s=>s.speaker),['','','純一','詞','','純一','']);assert.equal(exported.scenes[1].text,sample.slice(0,4).join('\n'));assert.equal(exported.scenes[6].text,'既存の次の場面');
+ for(const s of exported.scenes.slice(1,6)){assert.equal(s.image,null);assert.equal(s.imageMode,'inherit');assert.equal(s.bgm.mode,'inherit');assert.deepEqual(s.voices,[]);}
+ assert.ok(await page.evaluate(async()=>{const db=await new Promise(resolve=>{const r=indexedDB.open('tsuzuri-studio');r.onsuccess=()=>resolve(r.result);});const tx=db.transaction(['scenarios','drafts'],'readonly');const records=await new Promise(resolve=>{const r=tx.objectStore('scenarios').getAll();r.onsuccess=()=>resolve(r.result);});const draft=await new Promise(resolve=>{const r=tx.objectStore('drafts').get(records.find(r=>r.project.title==='まとめて作成テスト').id);r.onsuccess=()=>resolve(r.result);});db.close();return draft===undefined;}),'commit clears draft atomically');
+ await open();const source=modal().getByRole('textbox',{name:'まとめて作成する原稿'});await source.waitFor();assert.equal(await source.inputValue(),'');
+ const huge=Array.from({length:5000},(_,i)=>`「文章 ${i+1}」`).join('\n');await source.fill(huge);await modal().getByRole('button',{name:'行ごとに話者を指定'}).click();assert.equal(await page.locator('.bulk-line').count(),100);
+ await modal().getByRole('button',{name:'行一覧の次のページ'}).click();await modal().getByRole('checkbox',{name:'行101を選択',exact:true}).click();await modal().getByRole('checkbox',{name:'行105を選択',exact:true}).click({modifiers:['Shift']});await modal().getByText('5行を選択中',{exact:true}).waitFor();
+ await modal().getByRole('button',{name:/^純一/}).click();await modal().getByRole('checkbox',{name:'行106を選択',exact:true}).waitFor();assert.ok(await modal().getByRole('checkbox',{name:'行106を選択',exact:true}).isChecked());
+ await modal().getByRole('button',{name:'話者の割り当てを元に戻す'}).click();await modal().getByRole('button',{name:'未指定 5000',exact:true}).waitFor();
+ await modal().getByRole('button',{name:'次の未指定へ'}).click();await page.keyboard.press('Alt+2');assert.ok(await modal().getByRole('checkbox',{name:'行2を選択',exact:true}).isChecked());
+ await page.keyboard.press('Alt+3');assert.ok(await modal().getByRole('checkbox',{name:'行3を選択',exact:true}).isChecked());
+ await modal().getByRole('checkbox',{name:'一括指定後、次の未指定行を選ぶ'}).uncheck();
+ await modal().getByRole('button',{name:/^全行/}).click();await modal().getByRole('textbox',{name:'行の検索'}).fill('文章 49');const matched=await page.locator('.bulk-line').count();assert.ok(matched>0&&matched<=100);
+ await modal().getByRole('button',{name:/絞り込み全行を選択/}).click();await modal().getByRole('button',{name:/^詞/}).click();
+ await modal().getByRole('textbox',{name:'行の検索'}).fill('');await modal().getByRole('button',{name:/絞り込み全行を選択/}).click();await modal().getByRole('button',{name:/^純一/}).click();assert.equal(await page.locator('.bulk-preview-list article').count(),1);
+ await modal().getByRole('button',{name:'まとめて作成を閉じる'}).click();await modal().waitFor({state:'detached'});assert.equal(await page.locator('.scene-card').count(),7);
+ await page.reload();await page.getByRole('button',{name:'編集する',exact:true}).click();await open();await modal().getByRole('button',{name:'1シーンを追加',exact:true}).waitFor();assert.equal(await modal().getByRole('combobox',{name:'行1の話者',exact:true}).inputValue(),'"純一"');assert.equal(await page.locator('.bulk-line').count(),100);
+ await modal().getByRole('button',{name:'原稿へ戻る'}).click();assert.equal(await modal().getByRole('textbox',{name:'まとめて作成する原稿'}).inputValue(),huge);await modal().getByRole('button',{name:'行ごとに話者を指定'}).click();assert.equal(await modal().getByRole('combobox',{name:'行1の話者',exact:true}).inputValue(),'"純一"');
+ await modal().getByRole('button',{name:'1シーンを追加',exact:true}).click();await modal().waitFor({state:'detached'});assert.equal(await page.locator('.scene-card').count(),8);assert.equal((await exportProject()).scenes.at(-1).text,huge);
+ await open();await modal().getByRole('textbox',{name:'まとめて作成する原稿'}).waitFor();
+ await modal().locator('input[type=file]').setInputFiles({name:'bad.txt',mimeType:'text/plain',buffer:Buffer.from([0xff,0xfe])});await modal().getByRole('alert').waitFor();await modal().getByRole('button',{name:'下書きエラーを閉じる'}).click();
+ await modal().locator('input[type=file]').setInputFiles({name:'valid.txt',mimeType:'text/plain',buffer:Buffer.from('地の文。\r\n続く地の文。\r\n\r\n「セリフ」','utf8')});await modal().getByRole('button',{name:'行ごとに話者を指定'}).click();await modal().getByRole('button',{name:'次の未指定へ'}).click();await page.keyboard.press('Alt+2');
+ await page.evaluate(()=>{window.originalPut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){if(this.name==='scenarios')throw new DOMException('容量不足','QuotaExceededError');return window.originalPut.apply(this,args);};});
+ await modal().getByRole('button',{name:'2シーンを追加',exact:true}).click();await modal().getByRole('alert').waitFor();assert.equal(await page.locator('.scene-card').count(),8);
+ await page.evaluate(()=>{IDBObjectStore.prototype.put=window.originalPut;});await modal().getByRole('button',{name:'2シーンを追加',exact:true}).click();await modal().waitFor({state:'detached'});assert.equal(await page.locator('.scene-card').count(),10);
+ const final=await exportProject();assert.equal(final.scenes.at(-2).text,'地の文。\n続く地の文。');assert.equal(final.scenes.at(-1).speaker,'純一');
+ await page.setViewportSize({width:820,height:1180});await open();await modal().getByRole('textbox',{name:'まとめて作成する原稿'}).waitFor();assert.ok(await modal().evaluate(e=>e.getBoundingClientRect().width<=window.innerWidth));await page.keyboard.press('Escape');await modal().waitFor({state:'detached'});
+ assert.deepEqual(errors,[]);console.log('PASS: sample to five scenes, line speakers, merge, preview, insertion/image/BGM inheritance, 5000-line paging, shift/bulk/search/shortcuts/undo, draft restoration, atomic commit, UTF-8 TXT, quota error, tablet and Escape; no runtime errors');
+}finally{await browser.close();}
+
