@@ -1,4 +1,5 @@
-import {useState} from 'react';
+import {desktop} from './desktop';
+import {useEffect,useState} from 'react';
 import {Moon,Sun} from 'lucide-react';
 
 export const THEME_KEY='tsuzuri-ui-theme';
@@ -9,8 +10,10 @@ export function initializeTheme(){
 }
 export default function ThemeSwitch(){
  const [dark,setDark]=useState(()=>document.documentElement.dataset.theme==='dark');
+ useEffect(()=>{const update=()=>setDark(document.documentElement.dataset.theme==='dark');window.addEventListener('tsuzuri-theme',update);return()=>window.removeEventListener('tsuzuri-theme',update);},[]);
  return <button className="subtle theme-switch" aria-label="ダークモード" aria-pressed={dark} title={dark?'ライトモードに切り替え':'ダークモードに切り替え'} onClick={()=>{
   const next=!dark;setDark(next);document.documentElement.dataset.theme=next?'dark':'light';
+  if(desktop)void desktop.theme(next?'dark':'light').catch(()=>{});
   try{localStorage.setItem(THEME_KEY,next?'dark':'light');}catch{/* Keep the current session theme. */}
  }}>{dark?<Sun size={16}/>:<Moon size={16}/>}<span>{dark?'ライト':'ダーク'}</span></button>;
 }

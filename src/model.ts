@@ -1,3 +1,4 @@
+import {desktop,nativeMedia} from './desktop';
 import {registerAsset,assetUrl,isAssetRef} from './assets.ts';
 export type Voice = {id:string;name:string;data:string};
 export type Bgm = {mode:'inherit'}|{mode:'stop'}|{mode:'track';track:Voice};
@@ -42,6 +43,7 @@ export function parseProject(value:unknown,allowAssets=false):Project {
  if(!value || typeof value!=='object') throw new Error('シナリオ形式が正しくありません。');
  const p=value as Record<string,unknown>;
  if(p.version!==1 || typeof p.title!=='string' || !Array.isArray(p.scenes)) throw new Error('対応するシナリオJSONではありません（version: 1）。');
+ const ids=new Set<string>();
  const scenes=p.scenes.map((s:unknown)=>{
   if(!s || typeof s!=='object') throw new Error('シーン形式が正しくありません。');
   const v=s as Record<string,unknown>;
@@ -59,7 +61,8 @@ export function parseProject(value:unknown,allowAssets=false):Project {
    else if(setting.mode==='stop'||setting.mode==='inherit')bgm={mode:setting.mode};
    else throw new Error('BGMの設定が正しくありません。');
   }
-  return scene({text:v.text,speaker:v.speaker,image:imageMode==='custom'?v.image as string:null,imageName:imageMode==='custom'&&typeof v.imageName==='string'?v.imageName:'',imageMode:imageMode as ImageMode,voices:parsedVoices,bgm});
+  const id=typeof v.id==='string'&&v.id?v.id:crypto.randomUUID();if(ids.has(id))throw new Error('シーンIDが重複しています。');ids.add(id);
+  return scene({id,text:v.text,speaker:v.speaker,image:imageMode==='custom'?v.image as string:null,imageName:imageMode==='custom'&&typeof v.imageName==='string'?v.imageName:'',imageMode:imageMode as ImageMode,voices:parsedVoices,bgm});
  });
  let audioSettings=defaultAudioSettings();
  if(p.audioSettings!==undefined){
@@ -78,6 +81,7 @@ export function parseProject(value:unknown,allowAssets=false):Project {
  return {version:1,title:p.title,scenes,typewriter:p.typewriter===true,audioSettings,speakerColors};
 }
 export async function readVoice(file:File):Promise<Voice>{
+ if(desktop){const media=await nativeMedia(file,'audio');if(media)return {id:crypto.randomUUID(),name:media.name,data:media.url};}
  const extension=file.name.split('.').pop()?.toLowerCase();
  if(extension!=='wav'&&extension!=='mp3')throw new Error('WAVまたはMP3の音声ファイルを選択してください。');
  if(file.size>25*1024*1024)throw new Error('音声は1ファイル25MB以下にしてください。');
@@ -93,6 +97,7 @@ export async function readVoice(file:File):Promise<Voice>{
  return {id:crypto.randomUUID(),name:file.name,data:assetUrl(await registerAsset(normalized))};
 }
 export async function readImage(file:File):Promise<string> {
+ if(desktop){const media=await nativeMedia(file,'image');if(media)return media.url;}
  if(!['image/png','image/jpeg','image/webp','image/gif','image/avif'].includes(file.type))throw new Error('PNG・JPEG・WebP・GIF・AVIF画像を選択してください。');
  if(file.size>25*1024*1024)throw new Error('画像は1枚25MB以下にしてください。');
  const url=URL.createObjectURL(file);

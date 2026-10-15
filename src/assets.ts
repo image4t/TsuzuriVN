@@ -30,6 +30,7 @@ export async function encodeProject(project:Project):Promise<{project:Project;as
  const converted=await mapMedia(project,source=>{
   const known=pending.get(source);if(known)return known;
   const promise=(async()=>{
+   const local=/^tsuzuri-media:\/\/([a-f0-9-]{36})\/([a-f0-9]{64})$/.exec(source);if(local)return `asset:${local[2]}`;
    if(isAssetRef(source)){const asset=cachedAsset(source.slice(6));if(asset)found.set(asset.id,asset);return source;}
    const id=sources.get(source);if(id){const record=records.get(id)!;found.set(id,record);return `asset:${id}`;}
    if(!source.startsWith('blob:')&&!/^data:(image|audio)\/[a-z0-9-]+;base64,/.test(source))throw new Error('素材データを読み込めませんでした。');

@@ -1,3 +1,4 @@
+import {openMenu,closeMenu,readProgress,playbackAction} from './playback-menu.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -30,7 +31,7 @@ try{
  await page.getByRole('button',{name:'編集する',exact:true}).first().click();
  await page.locator('.scene-card').nth(3).waitFor();
  assert.equal(await page.locator('.scene-summary p').first().textContent(),'最初の場面\n日本語の文章です。');
- const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'書き出す',exact:true}).click();const download=await downloadPromise;const path=await download.path();const exported=JSON.parse(await fs.readFile(path,'utf8'));assert.equal(exported.scenes.length,4);assert.ok(exported.scenes[0].image.startsWith('data:image/png'));
+ const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'JSON書き出し',exact:true}).click();const download=await downloadPromise;const path=await download.path();const exported=JSON.parse(await fs.readFile(path,'utf8'));assert.equal(exported.scenes.length,4);assert.ok(exported.scenes[0].image.startsWith('data:image/png'));
  await page.getByRole('button',{name:'新規シナリオ'}).click();
  await page.locator('.empty-editor').waitFor();
  await page.locator('input[type=file][accept=".json,application/json"]').setInputFiles({name:'restore.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(exported))});
@@ -38,13 +39,13 @@ try{
  await page.getByRole('checkbox').check();
  await page.getByRole('button',{name:'再生する',exact:true}).click();
  await page.keyboard.press('Enter');assert.equal(await page.locator('.dialogue > .dialogue-text').textContent(),exported.scenes[0].text);
- await page.keyboard.press('Space');await page.getByText('2 / 4',{exact:true}).waitFor();
- await page.keyboard.press('ArrowLeft');await page.getByText('1 / 4',{exact:true}).waitFor();
- await page.keyboard.press('Enter');await page.locator('.game').click({position:{x:40,y:40}});await page.getByText('2 / 4',{exact:true}).waitFor();
- await page.getByRole('button',{name:'次へ',exact:true}).click();await page.getByRole('button',{name:'次へ',exact:true}).click();await page.getByText('3 / 4',{exact:true}).waitFor();
- await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');await page.getByText('4 / 4',{exact:true}).waitFor();
- for(let i=0;i<3 && await page.getByRole('button',{name:'次へ',exact:true}).isEnabled();i++)await page.getByRole('button',{name:'次へ',exact:true}).click();await page.getByText('物語の、その先へ。').waitFor();
- await page.getByRole('button',{name:'最初から読む'}).click();await page.getByText('1 / 4',{exact:true}).waitFor();await page.keyboard.press('Escape');
+ await page.keyboard.press('Space');assert.equal(await readProgress(page,'.playback-progress strong'),'2 / 4');
+ await page.keyboard.press('ArrowLeft');assert.equal(await readProgress(page,'.playback-progress strong'),'1 / 4');
+ await page.keyboard.press('Enter');await page.locator('.game').click({position:{x:40,y:40}});assert.equal(await readProgress(page,'.playback-progress strong'),'2 / 4');
+ await playbackAction(page,'次へ');await playbackAction(page,'次へ');assert.equal(await readProgress(page,'.playback-progress strong'),'3 / 4');
+ await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');assert.equal(await readProgress(page,'.playback-progress strong'),'4 / 4');
+ for(let i=0;i<3 && await page.locator('.ending').count()===0;i++)await playbackAction(page,'次へ');await page.getByText('物語の、その先へ。').waitFor();
+ await page.getByRole('button',{name:'最初から読む'}).click();assert.equal(await readProgress(page,'.playback-progress strong'),'1 / 4');await page.keyboard.press('Escape');
  await page.locator('input[type=file][accept=".json,application/json"]').setInputFiles({name:'broken.json',mimeType:'application/json',buffer:Buffer.from('{"version":2}')});await page.getByRole('alert').waitFor();assert.equal(await page.locator('.scene-card').count(),4);
  await page.getByRole('button',{name:'エラーを閉じる'}).click();
  await page.screenshot({path:'tests/editor.png',fullPage:true});

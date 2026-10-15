@@ -1,3 +1,5 @@
+import {readInputBytes,readInputText} from './desktop';
+import {desktop,registerFlusher} from './desktop';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowLeft,ArrowRight,Check,Plus,Search,Undo2,Upload,X} from 'lucide-react';
 import {emptyDraft,groupLines,parseLines,type BulkDraft,type ScriptLine} from './bulk';
@@ -22,8 +24,9 @@ export default function BulkCreator({scenarioId,speakers,speakerColors,onColorsC
   timer.current=setTimeout(()=>{const snapshot=draft;chain.current=chain.current.catch(()=>{}).then(()=>saveDraft(scenarioId,snapshot)).then(()=>{saved.current=rev;if(revision.current===rev)setStatus('下書き保存済み');}).catch(()=>{setStatus('下書き保存失敗');setError('下書きを保存できませんでした。容量を確認してください。入力内容をコピーするか、シーンに変換してJSONで保存してください。');});},350);
   return()=>{if(timer.current)clearTimeout(timer.current);};
  },[draft,ready,scenarioId]);
- useEffect(()=>{const leave=(e:BeforeUnloadEvent)=>{if(saved.current<revision.current){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',leave);return()=>window.removeEventListener('beforeunload',leave);},[]);
- const flush=async()=>{if(timer.current)clearTimeout(timer.current);await chain.current;await saveDraft(scenarioId,latest.current);saved.current=revision.current;};
+ useEffect(()=>{const leave=(e:BeforeUnloadEvent)=>{if(!desktop&&saved.current<revision.current){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',leave);return()=>window.removeEventListener('beforeunload',leave);},[]);
+ const flush=async()=>{if(!ready)throw new Error('下書きを読み込み中です。少し待ってから再試行してください。');if(timer.current)clearTimeout(timer.current);await chain.current.catch(()=>{});await saveDraft(scenarioId,latest.current);saved.current=revision.current;};
+ useEffect(()=>registerFlusher('bulk',flush));
  const close=async()=>{setBusy(true);try{await flush();onClose();}catch{setCloseFailed(true);setStatus('下書き保存失敗');setError('下書きを保存できませんでした。入力内容をコピーして保管してください。');}finally{setBusy(false);}};
  const knownSpeakers=useMemo(()=>Array.from(new Set([...speakers,...draft.speakers,...draft.lines.map(line=>line.speaker).filter((s):s is string=>!!s)])),[speakers,draft.speakers,draft.lines]);
  const groups=useMemo(()=>groupLines(draft.lines),[draft.lines]);const unset=draft.lines.filter(line=>line.speaker===null).length;

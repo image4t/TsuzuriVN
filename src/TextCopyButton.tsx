@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {Check,Copy} from 'lucide-react';
+import {desktop} from './desktop';
 
 export default function TextCopyButton({text}:{text:string}){
  const [status,setStatus]=useState('');
@@ -9,8 +10,8 @@ export default function TextCopyButton({text}:{text:string}){
  return <div className="text-copy-control"><span role="status" className="text-copy-status">{status}</span><button type="button" className="text-copy-button" aria-label="本文をコピー" title="本文全体をクリップボードにコピー" disabled={!text||busy} onClick={async()=>{
   const current=revision.current;setBusy(true);setStatus('');
   try{
-   if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');
-   await navigator.clipboard.writeText(text);
+   if(desktop)await desktop.copyText(text);
+   else {if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');await navigator.clipboard.writeText(text);}
    if(current===revision.current)setStatus('コピーしました');
   }catch{if(current===revision.current)setStatus('コピーできませんでした。本文を選択してコピーしてください。');}
   finally{setBusy(false);}

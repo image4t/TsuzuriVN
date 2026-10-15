@@ -1,0 +1,21 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import assert from 'node:assert/strict';
+const exec=promisify(execFile),workspace=process.cwd();
+const root=await fs.mkdtemp(path.resolve('.desktop-test-installer-'));
+const payload=path.join(root,'App');assert.ok(path.relative(workspace,payload).startsWith('.desktop-test-installer-'));
+for(const folder of ['UserData/作品','resources/CustomProjects','locales'])await fs.mkdir(path.join(payload,folder),{recursive:true});
+for(const [file,text] of [['TsuzuriVN.exe','app'],['resources/app.asar','app'],['locales/en-US.pak','app'],['UserData/作品/scenario.json','keep'],['resources/CustomProjects/scenario.json','keep']])await fs.writeFile(path.join(payload,file),text);
+const packageFolder=(await fs.readdir('.builder-cache')).find(name=>name.startsWith('nsis-')&&!name.startsWith('nsis-resources'));
+if(!packageFolder)throw new Error('先にnpm run dist:winでNSISツールを取得してください。');
+let compiler;
+for(const folder of await fs.readdir(path.join('.builder-cache',packageFolder))){const candidate=path.resolve('.builder-cache',packageFolder,folder,'Bin','makensis.exe');try{await fs.access(candidate);compiler=candidate;break;}catch{}}
+if(!compiler)throw new Error('makensis.exeが見つかりません。');
+const executable=path.join(root,'preserve-test.exe'),script=path.join(root,'preserve-test.nsi');
+await fs.writeFile(script,`Unicode true\nName "TsuzuriVN data preservation test"\nOutFile "${executable}"\nSilentInstall silent\nRequestExecutionLevel user\n!define APP_EXECUTABLE_FILENAME "TsuzuriVN.exe"\n!define UNINSTALL_FILENAME "Uninstall TsuzuriVN.exe"\n!include "${path.resolve('build/installer.nsh')}"\nSection\nStrCpy $INSTDIR "${payload}"\n!insertmacro customRemoveFiles\nSectionEnd\n`);
+await exec(compiler,['/V2','/INPUTCHARSET','UTF8',script],{windowsHide:true});await exec(executable,[],{windowsHide:true});
+assert.equal(await fs.readFile(path.join(payload,'UserData/作品/scenario.json'),'utf8'),'keep');assert.equal(await fs.readFile(path.join(payload,'resources/CustomProjects/scenario.json'),'utf8'),'keep');
+for(const file of ['TsuzuriVN.exe','resources/app.asar','locales/en-US.pak'])await assert.rejects(fs.access(path.join(payload,file)));
+console.log('PASS: actual NSIS cleanup macro removes application payload and preserves UserData plus custom project folders; no registry/install changes');

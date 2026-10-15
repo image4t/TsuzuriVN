@@ -1,1 +1,74 @@
-{"name":"visual-novel-studio","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"vite --host 127.0.0.1","build":"tsc -b && vite build","preview":"vite preview --host 127.0.0.1","test":"vitest run"},"dependencies":{"fflate":"^0.8.3","lucide-react":"^0.468.0","react":"^19.0.0","react-dom":"^19.0.0"},"devDependencies":{"@playwright/test":"^1.50.0","@types/node":"^24.19.2","@types/react":"^19.0.0","@types/react-dom":"^19.0.0","@vitejs/plugin-react":"^4.3.4","typescript":"~5.7.2","vite":"^6.0.5","vitest":"^5.0.3"}}
+{
+  "name": "tsuzuri-vn",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build && node scripts/launch-desktop.mjs",
+    "start": "node scripts/launch-desktop.mjs",
+    "build": "tsc -b && vite build && tsc -p electron/tsconfig.json",
+    "preview": "node scripts/launch-desktop.mjs",
+    "test": "vitest run",
+    "test:desktop": "npm run build && node tests/desktop.mjs",
+    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "pack:win": "npm run build && electron-builder --win --dir --x64 --publish never"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^5.0.3"
+  },
+  "productName": "TsuzuriVN",
+  "description": "日本語ビジュアルノベル制作・再生ツール",
+  "author": "image4t",
+  "main": "desktop-dist/electron/main.js",
+  "build": {
+    "appId": "com.image4t.tsuzurivn",
+    "productName": "TsuzuriVN",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop-dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "executableName": "TsuzuriVN",
+      "icon": "build/icon.ico",
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "TsuzuriVN-Setup-${version}.${ext}",
+      "installerIcon": "build/icon.ico",
+      "include": "build/installer.nsh"
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import {openMenu,closeMenu,readProgress,playbackAction} from './playback-menu.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 const browser=await chromium.launch({channel:'msedge',headless:true});
@@ -15,9 +16,9 @@ try{
  const dimensions=()=>page.locator('.dialogue').evaluate(e=>({width:e.clientWidth,height:e.clientHeight}));
  const size=await dimensions();assert.equal(size.height,238);
  const pages=[];
- const pageCount=Number((await page.locator('.page-number').textContent()).match(/\/ (\d+)/)[1]);assert.ok(pageCount>1);
+ const pageCount=Number((await readProgress(page)).match(/\/ (\d+)/)[1]);assert.ok(pageCount>1);
  for(let i=0;i<pageCount;i++){
-  await page.locator('.page-number').filter({hasText:`${i+1} / ${pageCount} ページ`}).waitFor();
+  assert.equal(await readProgress(page),`${i+1} / ${pageCount} ページ`);
   pages.push(await text.textContent());
   assert.deepEqual(await dimensions(),size);
   assert.ok(await text.evaluate(e=>e.scrollHeight<=e.clientHeight),'page must fit four lines');
@@ -26,7 +27,7 @@ try{
  assert.equal(pages.join(''),longText,'no text lost or duplicated');
  assert.equal(await text.textContent(),'次のシーン');
  await page.keyboard.press('ArrowLeft');assert.equal(await text.textContent(),pages.at(-1));
- await page.getByRole('button',{name:'戻る',exact:true}).click();assert.equal(await text.textContent(),pages.at(-2));
+ await playbackAction(page,'戻る');assert.equal(await text.textContent(),pages.at(-2));
  await page.keyboard.press('ArrowRight');assert.equal(await text.textContent(),pages.at(-1));
  await page.keyboard.press('Enter');assert.equal(await text.textContent(),'次のシーン');
  await page.keyboard.press('Space');await page.getByText('物語の、その先へ。').waitFor();
@@ -37,7 +38,7 @@ try{
  await page.keyboard.press('Escape');await page.getByRole('checkbox').check();
  await page.getByRole('button',{name:'再生する',exact:true}).click();
  await page.keyboard.press('Enter');assert.equal(await text.textContent(),pages[0]);
- await page.keyboard.press('Enter');await page.locator('.page-number').filter({hasText:`2 / ${pageCount} ページ`}).waitFor();
+ await page.keyboard.press('Enter');assert.equal(await readProgress(page),`2 / ${pageCount} ページ`);
  await page.keyboard.press('Space');assert.equal(await text.textContent(),pages[1]);
  assert.deepEqual(errors,[]);console.log(`PASS: ${pageCount} fixed-size pages, full text preservation, click/key navigation, page/scene back, ending/restart, tablet scaling, typewriter; no runtime errors`);
 }finally{await browser.close();}

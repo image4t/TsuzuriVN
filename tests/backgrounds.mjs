@@ -6,7 +6,7 @@ const page=await browser.newPage({viewport:{width:1440,height:1000}});const erro
 const upload=()=>page.locator('input[type=file][accept^="image/png"]').first();
 const selected=()=>page.getByAltText('選択した背景画像');
 const scene=async index=>page.locator('.scene-select').nth(index).click();
-const exportProject=async()=>{const promise=page.waitForEvent('download');await page.getByRole('button',{name:'書き出す',exact:true}).click();const download=await promise;return JSON.parse(await fs.readFile(await download.path(),'utf8'));};
+const exportProject=async()=>{const promise=page.waitForEvent('download');await page.getByRole('button',{name:'JSON書き出し',exact:true}).click();const download=await promise;return JSON.parse(await fs.readFile(await download.path(),'utf8'));};
 try{
  await page.goto(process.env.VN_TEST_URL??'http://127.0.0.1:5175');await page.getByRole('button',{name:'新規シナリオ',exact:true}).click();await page.getByRole('button',{name:'シーンを追加',exact:true}).first().click();
  assert.ok(await page.getByRole('radio',{name:'前の背景画像を引き継ぐ'}).isChecked());assert.equal(await selected().count(),0);

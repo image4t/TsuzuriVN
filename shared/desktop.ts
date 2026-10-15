@@ -1,0 +1,26 @@
+export type BinaryAsset={id:string;type:string;bytes:Uint8Array};
+export type DesktopRecord={id:string;project:unknown;createdAt:number;updatedAt:number;folder?:string;warning?:string};
+export type DesktopSettings={root:string;defaultRoot:string;rootMode:'default'|'custom';storageWarning?:string;theme:'light'|'dark';recent:{id:string;folder:string;title:string}[]};
+export type DesktopAPI={
+ list():Promise<DesktopRecord[]>;
+ load(id:string):Promise<DesktopRecord>;
+ save(record:DesktopRecord,assets:BinaryAsset[],clearDraft?:boolean):Promise<DesktopRecord>;
+ remove(id:string):Promise<void>;
+ duplicate(id:string):Promise<DesktopRecord>;
+ openProject():Promise<DesktopRecord|null>;
+ chooseRoot():Promise<DesktopSettings>;
+ resetRoot():Promise<DesktopSettings>;
+ settings():Promise<DesktopSettings>;
+ theme(value:'light'|'dark'):Promise<void>;
+ copyText(text:string):Promise<void>;
+ reveal(id?:string):Promise<void>;
+ backup(id:string):Promise<string>;
+ restore(id:string):Promise<DesktopRecord|null>;
+ loadDraft(id:string):Promise<unknown>;
+ saveDraft(id:string,draft:unknown):Promise<void>;
+ importMedia(id:string,path:string,kind:'image'|'audio'):Promise<{id:string;name:string;url:string}>;
+ filePath(file:File):string;
+ readInput(path:string):Promise<Uint8Array>;
+ exportFile(name:string,bytes:Uint8Array):Promise<boolean>;
+ onFlush(handler:()=>Promise<void>):()=>void;
+};

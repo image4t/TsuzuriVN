@@ -1,0 +1,37 @@
+import {_electron as electron} from '@playwright/test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+const directory=await fs.mkdtemp(path.resolve('.desktop-test-'));
+const env={...process.env,TSUZURI_TEST_USER_DATA:path.join(directory,'userData'),TSUZURI_TEST_DOCUMENTS:path.join(directory,'Documents')};delete env.ELECTRON_RUN_AS_NODE;
+let app;
+try{
+ app=await electron.launch({args:['.'],env,timeout:30000});const page=await app.firstWindow();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.getByRole('button',{name:'新規シナリオ',exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>typeof window.require),'undefined');assert.equal(await page.evaluate(()=>typeof window.tsuzuri.save),'function');
+ await page.getByRole('button',{name:'新規シナリオ',exact:true}).click();await page.getByRole('button',{name:'シーンを追加',exact:true}).first().click();
+ await page.getByRole('textbox',{name:'本文',exact:true}).fill('デスクトップで保存する日本語。');await page.getByText('自動保存済み',{exact:true}).waitFor();
+ await app.evaluate(({clipboard})=>{clipboard.writeText=text=>{globalThis.__testCopiedText=text;};});await page.getByRole('button',{name:'本文をコピー',exact:true}).click();await page.getByText('コピーしました',{exact:true}).waitFor();assert.equal(await app.evaluate(()=>globalThis.__testCopiedText),'デスクトップで保存する日本語。');
+ const records=await page.evaluate(()=>window.tsuzuri.list());assert.equal(records.length,1);let doc=JSON.parse(await fs.readFile(path.join(records[0].folder,'scenario.json'),'utf8'));assert.equal(doc.project.scenes[0].text,'デスクトップで保存する日本語。');
+ const id=doc.project.scenes[0].id;
+ await page.getByRole('button',{name:'文章からまとめて作成'}).click();await page.locator('.bulk-dialog textarea').fill('下書きの原稿\n「こんにちは」');await page.getByText('下書き保存済み',{exact:true}).waitFor();
+ assert.ok((await fs.readFile(path.join(records[0].folder,'drafts','bulk.json'),'utf8')).includes('下書きの原稿'));
+ await page.keyboard.press('Escape');
+ await page.locator('.voice-path-import summary').click();await page.getByRole('textbox',{name:'音声ファイルのフルパス',exact:true}).fill(path.resolve('tests/fixtures/tone.mp3'));await page.getByRole('button',{name:'パスから音声を追加',exact:true}).click();await page.locator('.voice-list li').waitFor();await page.getByText('自動保存済み',{exact:true}).waitFor();
+ doc=JSON.parse(await fs.readFile(path.join(records[0].folder,'scenario.json'),'utf8'));const mediaId=doc.project.scenes[0].voices[0].data.slice(6);assert.ok(doc.assets[mediaId]);assert.ok(!JSON.stringify(doc).includes('base64'));
+ const response=await page.evaluate(async([project,asset])=>{const r=await fetch(`tsuzuri-media://${project}/${asset}`);return {ok:r.ok,size:(await r.blob()).size};},[records[0].id,mediaId]);assert.ok(response.ok);assert.equal(response.size,(await fs.stat('tests/fixtures/tone.mp3')).size);
+ await page.locator('input[data-testid="bgm-input"]').setInputFiles(path.resolve('tests/fixtures/tone.mp3'));await page.getByText('自動保存済み',{exact:true}).waitFor();await page.getByRole('button',{name:'シーンを追加',exact:true}).first().click();await page.getByRole('textbox',{name:'本文',exact:true}).fill('BGMを引き継ぐ場面');await page.locator('.scene-select').first().click();
+ await page.evaluate(()=>{const Original=window.Audio;window.__testAudio=[];window.Audio=function(...args){const audio=new Original(...args);window.__testAudio.push(audio);return audio;};});
+ console.log('Testing native voice and BGM playback');await page.getByRole('button',{name:'このシーンから再生'}).click();await page.getByRole('button',{name:'ボイスを再生',exact:true}).waitFor();await page.waitForFunction(()=>window.__testAudio.length===2&&window.__testAudio.every(a=>a.currentTime>0));await page.keyboard.press('ArrowRight');assert.equal(await page.locator('.dialogue > .dialogue-text').textContent(),'BGMを引き継ぐ場面');assert.equal(await page.evaluate(()=>window.__testAudio.length),2);assert.ok(await page.evaluate(()=>window.__testAudio.some(a=>a.loop&&!a.paused)));await page.keyboard.press('Escape');assert.ok(await page.evaluate(()=>window.__testAudio.every(a=>a.paused)));
+ console.log('Testing manual save, backup and close flush');await page.getByRole('button',{name:'保存・再試行',exact:true}).click();await page.getByText('保存しました',{exact:true}).waitFor();
+ const backup=await page.evaluate(id=>window.tsuzuri.backup(id),records[0].id);assert.ok((await fs.stat(path.join(backup,'scenario.json'))).isFile());
+ await page.getByRole('textbox',{name:'本文',exact:true}).fill('終了直前の文章');
+ await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].close());await app.waitForEvent('close');app=undefined;
+ doc=JSON.parse(await fs.readFile(path.join(records[0].folder,'scenario.json'),'utf8'));assert.equal(doc.project.scenes[0].text,'終了直前の文章');assert.equal(doc.project.scenes[0].id,id);
+ app=await electron.launch({args:['.'],env});const restored=await app.firstWindow();await restored.getByRole('button',{name:'編集する',exact:true}).click();assert.equal(await restored.getByRole('textbox',{name:'本文',exact:true}).inputValue(),'終了直前の文章');assert.equal(await restored.locator('.voice-list li').count(),1);
+ await restored.screenshot({path:'tests/desktop.png',fullPage:true});assert.deepEqual(errors,[]);
+ await restored.getByRole('textbox',{name:'本文',exact:true}).fill('異常終了直前の文章');await app.evaluate(()=>process.exit(23)).catch(()=>{});app=undefined;
+ console.log('Crash process exited; verifying last valid document');const afterCrash=JSON.parse(await fs.readFile(path.join(records[0].folder,'scenario.json'),'utf8'));assert.ok(['終了直前の文章','異常終了直前の文章'].includes(afterCrash.project.scenes[0].text));
+ app=await electron.launch({args:['.'],env});const crashRestored=await app.firstWindow();await crashRestored.getByRole('button',{name:'編集する',exact:true}).click();assert.equal(await crashRestored.getByRole('textbox',{name:'本文',exact:true}).inputValue(),afterCrash.project.scenes[0].text);
+ console.log(`PASS: Electron isolation, native filesystem scenarios/drafts/media, native clipboard, on-demand protocol, manual save/backup, close flush, crash/restart and scene ID preservation. Test data: ${directory}`);
+}finally{if(app)await app.close();}

@@ -7,7 +7,7 @@ const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',
 const sample=['川面が、夕日に染まっていた。','西の空から差し込む橙色の光が、緩やかに流れる川の表面をきらきらと輝かせている。対岸には住宅街が続き、その向こうに見える建物の輪郭も、少しずつ夕闇に溶け始めていた。','放課後の河川敷。','緩やかな土手の斜面に腰を下ろした純一は、大きく息を吐いた。','「はあ……。なんか、こういうのもいいね」','「何が？」','隣に座る詞が、膝の上に置いた鞄から視線を上げた。','「こうして絢辻さんと、何もしないでのんびりするのってさ」'];
 const modal=()=>page.getByRole('dialog',{name:'文章から、まとめてシーンを作る'});
 const open=async()=>{await page.getByRole('button',{name:'文章からまとめて作成'}).click();await modal().getByRole('button',{name:'まとめて作成を閉じる'}).waitFor();await modal().getByRole('button',{name:'まとめて作成を閉じる'}).isEnabled();};
-const exportProject=async()=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name:'書き出す',exact:true}).click();const download=await pending;return JSON.parse(await fs.readFile(await download.path(),'utf8'));};
+const exportProject=async()=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name:'JSON書き出し',exact:true}).click();const download=await pending;return JSON.parse(await fs.readFile(await download.path(),'utf8'));};
 try{
  await page.goto(process.env.VN_TEST_URL??'http://127.0.0.1:5175');
  const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=';

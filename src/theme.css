@@ -35,3 +35,12 @@
 .player{color-scheme:dark}
 
 [data-theme=dark] .text-copy-status{color:#b5d2bf}
+
+[data-theme=dark] .settings-dialog{background:#1e272b;color:#dce7e1;border-color:#43514f}
+[data-theme=dark] .settings-dialog :is(header,section){border-color:#35413f}
+[data-theme=dark] .settings-dialog :is(button,select){background:#253136;border-color:#43514f;color:#dce7e1}
+[data-theme=dark] .settings-dialog button:hover{background:#32423f}
+[data-theme=dark] .settings-dialog :is(section p,footer){color:#aebfb4}
+[data-theme=dark] .settings-dialog .settings-path{background:#253136;border-color:#43514f;color:#dce7e1}
+[data-theme=dark] .settings-dialog .primary{background:#426e59;color:#fff}
+[data-theme=dark] .settings-dialog .settings-error{background:#412c2c;color:#f0b8a9;border-color:#79514b}

@@ -1,3 +1,4 @@
+import {openMenu,closeMenu,readProgress,playbackAction} from './playback-menu.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -32,8 +33,8 @@ try{
  const longText=('長い文章も音声を継続して読み進める。\n').repeat(12);
  await page.getByRole('textbox',{name:'本文'}).fill(longText);
  await audioInput().setInputFiles({name:'broken.wav',mimeType:'audio/wav',buffer:Buffer.from('not an audio')});await page.getByRole('alert').waitFor();assert.equal(await page.locator('.voice-list li').count(),2);await page.getByRole('button',{name:'エラーを閉じる'}).click();
- await page.getByRole('button',{name:'シナリオ一覧',exact:true}).click();await page.getByRole('button',{name:'編集する',exact:true}).click();assert.equal(await page.locator('.voice-list li').count(),2);
- const pending=page.waitForEvent('download');await page.getByRole('button',{name:'書き出す',exact:true}).click();const download=await pending;const exported=JSON.parse(await fs.readFile(await download.path(),'utf8'));
+ await page.getByRole('button',{name:'シナリオ一覧',exact:true}).click();await page.getByRole('button',{name:'編集する',exact:true}).click();await page.locator('.voice-list li').nth(1).waitFor();assert.equal(await page.locator('.voice-list li').count(),2);
+ const pending=page.waitForEvent('download');await page.getByRole('button',{name:'JSON書き出し',exact:true}).click();const download=await pending;const exported=JSON.parse(await fs.readFile(await download.path(),'utf8'));
  assert.equal(exported.scenes[0].voices.length,2);assert.ok(exported.scenes[0].voices[0].data.startsWith('data:audio/mpeg'));assert.ok(exported.scenes[0].voices[1].data.startsWith('data:audio/wav'));
  await jsonInput().setInputFiles({name:'voices.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({...exported,title:'ボイスを復元した作品'}))});
  await page.waitForFunction(()=>document.querySelector('.project-settings input')?.value==='ボイスを復元した作品');assert.equal(await page.locator('.voice-list li').count(),2);
@@ -43,11 +44,11 @@ try{
  await page.waitForFunction(()=>window.testAudios.some(a=>(a.src&&a.testMime==='audio/mpeg')&&a.currentTime>0));
  await page.waitForFunction(()=>window.testAudios.some(a=>(a.src&&a.testMime==='audio/wav')&&a.currentTime>0));
  const count=await page.evaluate(()=>window.testAudios.length);
- await page.locator('.game').click({position:{x:40,y:40}});assert.match(await page.locator('.page-number').textContent(),/^2 \//);
+ await page.locator('.game').click({position:{x:40,y:40}});assert.match(await readProgress(page),/^2 \//);
  assert.equal(await page.evaluate(()=>window.testAudios.length),count,'page changes must not recreate audio');
  assert.ok(await page.evaluate(()=>window.testAudios.some(a=>!a.paused&&a.currentTime>0)));
  await page.keyboard.press('ArrowLeft');assert.equal(await page.evaluate(()=>window.testAudios.length),count);
- const total=Number((await page.locator('.page-number').textContent()).match(/\/ (\d+)/)[1]);
+ const total=Number((await readProgress(page)).match(/\/ (\d+)/)[1]);
  for(let i=0;i<total;i++)await page.keyboard.press('ArrowRight');
  assert.equal(await page.locator('.dialogue > .dialogue-text').textContent(),'次の場面');
  assert.ok(await page.evaluate(()=>window.testAudios.every(a=>a.paused)),'scene change stops previous voice');
@@ -55,13 +56,13 @@ try{
  await page.keyboard.press('Escape');assert.ok(await page.evaluate(()=>window.testAudios.every(a=>a.paused)),'exit stops playback');
  // Audio policy rejection must offer a retry and keep scene navigation functional.
  await page.evaluate(()=>{window.nativePlay=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){return Promise.reject(new DOMException('blocked','NotAllowedError'));};});
- await page.getByRole('button',{name:'再生する',exact:true}).click();await page.getByRole('button',{name:'音声を再生',exact:true}).waitFor();
- await page.evaluate(()=>{HTMLMediaElement.prototype.play=window.nativePlay;});await page.getByRole('button',{name:'音声を再生',exact:true}).click();
+ await page.getByRole('button',{name:'再生する',exact:true}).click();await openMenu(page);await page.getByRole('button',{name:'音声を再生',exact:true}).waitFor();
+ await page.evaluate(()=>{HTMLMediaElement.prototype.play=window.nativePlay;});await playbackAction(page,'音声を再生');
  await page.waitForFunction(()=>window.testAudios.some(a=>!a.paused&&a.currentTime>0));await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'first.mp3を削除'}).click();assert.equal(await page.locator('.voice-list li').count(),1);
  await page.getByRole('button',{name:'シーンを複製',exact:true}).click();assert.equal(await page.locator('.voice-list li').count(),1);
  await page.getByRole('button',{name:'second.wavを削除'}).click();assert.equal(await page.locator('.voice-list li').count(),0);await page.locator('.scene-select').first().click();assert.equal(await page.locator('.voice-list li').count(),1);
- await page.getByText('自動保存済み',{exact:true}).waitFor();await page.reload();await page.getByRole('button',{name:'編集する',exact:true}).first().click();assert.equal(await page.locator('.voice-list li').count(),1);
+ await page.getByText('自動保存済み',{exact:true}).waitFor();await page.reload();await page.getByRole('button',{name:'編集する',exact:true}).first().click();await page.locator('.voice-list li').first().waitFor();assert.equal(await page.locator('.voice-list li').count(),1);
  assert.deepEqual(errors,[]);console.log('PASS: previous-image inheritance, WAV/MP3 import and preview, reorder/delete, native sequential playback, page continuation, scene/exit stop, autoplay retry, JSON/autosave restore, independent clone, invalid audio; no runtime errors');
 }finally{await browser.close();}
 

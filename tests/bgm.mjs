@@ -1,3 +1,4 @@
+import {openMenu,closeMenu,readProgress,playbackAction} from './playback-menu.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -19,7 +20,7 @@ try{
  await page.getByRole('radio',{name:'このシーンから停止'}).check();assert.equal(await page.locator('.bgm-file strong').textContent(),'BGMなし');
  await page.getByRole('radio',{name:'前のBGMを引き継ぐ'}).check();assert.equal(await page.locator('.bgm-file strong').textContent(),'music.mp3');
  await bgmInput().setInputFiles({name:'bad.wav',mimeType:'audio/wav',buffer:Buffer.from('broken')});await page.getByRole('alert').waitFor();assert.equal(await page.locator('.bgm-file strong').textContent(),'music.mp3');await page.getByRole('button',{name:'エラーを閉じる'}).click();
- const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'書き出す',exact:true}).click();const download=await downloadPromise;const saved=JSON.parse(await fs.readFile(await download.path(),'utf8'));
+ const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'JSON書き出し',exact:true}).click();const download=await downloadPromise;const saved=JSON.parse(await fs.readFile(await download.path(),'utf8'));
  assert.equal(saved.scenes[0].bgm.mode,'track');assert.equal(saved.scenes[1].bgm.mode,'inherit');assert.deepEqual(saved.audioSettings,{voiceVolume:.8,bgmVolume:.25});
  const voice={id:'v',name:'voice.wav',data:`data:audio/wav;base64,${wav(20).toString('base64')}`};
  const second={id:'b',name:'second.wav',data:`data:audio/wav;base64,${wav(.7).toString('base64')}`};
@@ -31,14 +32,14 @@ try{
  await page.getByRole('button',{name:'再生する',exact:true}).click();
  await page.waitForFunction(()=>window.testAudios.some(a=>a.loop&&!a.paused&&a.volume===.25&&a.currentTime>0)&&window.testAudios.some(a=>!a.loop&&!a.paused&&a.volume===.8&&a.currentTime>0));
  await page.waitForFunction(()=>window.loopWraps>0);const created=await page.evaluate(()=>window.testAudios.length);
- await page.locator('.game').click({position:{x:30,y:30}});assert.match(await page.locator('.page-number').textContent(),/^2 \//);assert.equal(await page.evaluate(()=>window.testAudios.length),created);
- await page.getByRole('button',{name:'音量設定',exact:true}).click();
+ await page.locator('.game').click({position:{x:30,y:30}});assert.match(await readProgress(page),/^2 \//);assert.equal(await page.evaluate(()=>window.testAudios.length),created);
+ await openMenu(page);await page.getByRole('button',{name:'音量設定',exact:true}).click();
  await setVolume('BGM音量',10);await setVolume('ボイス音量',40);
  await page.waitForFunction(()=>window.testAudios.some(a=>a.loop&&!a.paused&&a.volume===.1)&&window.testAudios.some(a=>!a.loop&&!a.paused&&a.volume===.4));assert.equal(await page.evaluate(()=>window.testAudios.length),created);
- await page.getByRole('slider',{name:'BGM音量',exact:true}).focus();await page.keyboard.press('ArrowRight');assert.match(await page.locator('.page-number').textContent(),/^2 \//);assert.equal(await page.getByRole('slider',{name:'BGM音量',exact:true}).inputValue(),'11');
+ await page.getByRole('slider',{name:'BGM音量',exact:true}).focus();await page.keyboard.press('ArrowRight');assert.match(await readProgress(page),/^2 \//);assert.equal(await page.getByRole('slider',{name:'BGM音量',exact:true}).inputValue(),'11');
  await setVolume('BGM音量',0);await page.waitForFunction(()=>window.testAudios.some(a=>a.loop&&!a.paused&&a.volume===0));
- await page.getByRole('button',{name:'音量設定',exact:true}).click();await page.locator('.game').click({position:{x:30,y:30}});
- const total=Number((await page.locator('.page-number').textContent()).match(/\/ (\d+)/)[1]);
+ await openMenu(page);await page.getByRole('button',{name:'音量設定',exact:true}).click();await closeMenu(page);await page.locator('.game').click({position:{x:30,y:30}});
+ const total=Number((await readProgress(page)).match(/\/ (\d+)/)[1]);
  for(let i=2;i<total;i++)await page.keyboard.press('ArrowRight');
  assert.equal(await page.locator('.dialogue > .dialogue-text').textContent(),'同じ曲を引き継ぐ場面');assert.equal(await page.evaluate(()=>window.testAudios.length),created);
  assert.ok(await page.evaluate(()=>window.testAudios.some(a=>a.loop&&!a.paused)),'BGM continues through inherited scene');assert.ok(await page.evaluate(()=>window.testAudios.filter(a=>!a.loop).every(a=>a.paused)),'voice stops independently');
@@ -50,8 +51,8 @@ try{
  await page.keyboard.press('Escape');await page.locator('.scene-select').nth(1).click();await page.getByRole('button',{name:'このシーンから再生'}).click();
  await page.waitForFunction(()=>window.testAudios.some(a=>a.loop&&(a.src&&a.testMime==='audio/mpeg')&&!a.paused));await page.keyboard.press('Escape');assert.ok(await page.evaluate(()=>window.testAudios.every(a=>a.paused)));
  await page.evaluate(()=>{window.nativePlay=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){return this.loop?Promise.reject(new DOMException('blocked','NotAllowedError')):window.nativePlay.call(this);};});
- await page.getByRole('button',{name:'このシーンから再生'}).click();await page.getByRole('button',{name:'BGMを再生',exact:true}).waitFor();
- await page.evaluate(()=>{HTMLMediaElement.prototype.play=window.nativePlay;});await page.getByRole('button',{name:'BGMを再生',exact:true}).click();await page.waitForFunction(()=>window.testAudios.some(a=>a.loop&&!a.paused));await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'このシーンから再生'}).click();await openMenu(page);await page.getByRole('button',{name:'BGMを再生',exact:true}).waitFor();
+ await page.evaluate(()=>{HTMLMediaElement.prototype.play=window.nativePlay;});await playbackAction(page,'BGMを再生');await page.waitForFunction(()=>window.testAudios.some(a=>a.loop&&!a.paused));await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'シナリオ一覧',exact:true}).click();await page.getByRole('article',{name:'BGM再生テスト',exact:true}).getByRole('button',{name:'編集する',exact:true}).click();assert.equal(await page.getByRole('slider',{name:'BGM音量',exact:true}).inputValue(),'0');assert.equal(await page.getByRole('slider',{name:'ボイス音量',exact:true}).inputValue(),'40');assert.equal(await page.locator('.bgm-file strong').textContent(),'music.mp3');
  await page.getByText('自動保存済み',{exact:true}).waitFor();await page.reload();await page.getByRole('article',{name:'BGM再生テスト',exact:true}).getByRole('button',{name:'編集する',exact:true}).click();assert.equal(await page.getByRole('slider',{name:'BGM音量',exact:true}).inputValue(),'0');
  assert.deepEqual(errors,[]);console.log('PASS: BGM upload/preview, inheritance without restart, native looping, change/stop/back/middle start, simultaneous voice, independent live volumes and mute, slider keyboard without progression, JSON/autosave restore, playback/reading errors; no runtime errors');
